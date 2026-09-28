@@ -106,6 +106,50 @@ html, body {
   pointer-events: auto;
 }
 
+/* ===== BACKDROP ===== */
+/* The painting lives in screen space rather than on a 3D surface so it
+   displays near its native resolution; three-scene.js pans and tilts it with
+   the camera, which is how distant scenery moves anyway. */
+#backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  --strip-h: 125vh;
+}
+
+.backdrop-rot {
+  position: absolute;
+  inset: -20%;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.backdrop-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  height: var(--strip-h);
+  will-change: transform;
+}
+
+.backdrop-strip span {
+  flex: none;
+  height: 100%;
+  /* 2px overlap hides sub-pixel gaps between tiles; the advance stays exact. */
+  width: calc(var(--strip-h) * 2.9985 + 2px);
+  margin-right: -2px;
+  background: url('assets/mountains.webp') center / 100% 100% no-repeat;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 86%, transparent 100%);
+}
+
+.backdrop-strip .flip {
+  transform: scaleX(-1);
+}
+
 /* ===== 3D SAMURAI SCENE ===== */
 #bg-canvas {
   position: fixed;

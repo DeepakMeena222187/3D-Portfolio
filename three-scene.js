@@ -103,7 +103,6 @@ function runScene() {
   const samurai = new THREE.Group();
   scene.add(samurai);
 
-  buildPanorama();
   buildGround();
   const petals = buildPetals();
 
@@ -300,33 +299,42 @@ function runScene() {
     }
   );
 
-  // ----- Scene dressing -----
-  function buildPanorama() {
-    // The painting wraps the world on the inside of a cylinder. Mirrored
-    // repeat makes the two halves meet seamlessly.
-    const R = 38;
-    const H = (Math.PI * R) / 3;
-    const tex = texLoader.load('assets/mountains.webp');
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = THREE.MirroredRepeatWrapping;
-    tex.repeat.x = 2;
-    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  // ----- Backdrop -----
+  // Pans the screen-space painting (#backdrop) with the camera: turning the
+  // drone slides it sideways, pitching slides it vertically, banking tilts it.
+  const backdropRot = document.querySelector('#backdrop .backdrop-rot');
+  const backdropStrip = document.querySelector('#backdrop .backdrop-strip');
+  const TILE_ASPECT = 2.9985;
+  const SUN_U = 0.8325; // the rising sun's centre, as a fraction across the painting
+  const HORIZON_V = 0.7; // lake/mountain line, as a fraction down the painting
 
-    const geo = new THREE.CylinderGeometry(R, R, H, 96, 1, true, 0.38 * Math.PI, Math.PI * 2);
-    const mat = new THREE.MeshBasicMaterial({
-      map: tex,
-      side: THREE.BackSide,
-      fog: false,
-      toneMapped: false,
-      depthWrite: false,
-    });
-    const pano = new THREE.Mesh(geo, mat);
-    pano.renderOrder = -1;
-    // The lake/mountain horizon (~30% up the painting) sits near eye level.
-    pano.position.y = H / 2 - 0.3 * H + 1.2;
-    scene.add(pano);
+  function updateBackdrop(az, el, fov, bankRad) {
+    if (!backdropStrip) return;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const stripH = H * 1.25;
+    const tileW = stripH * TILE_ASPECT;
+    const period = tileW * 2;
+    const hfov = 2 * Math.atan(Math.tan((fov * DEG) / 2) * camera.aspect) / DEG;
+    const kx = W / hfov;
+    const ky = H / fov;
+
+    // Screen x of the strip's left edge; calibrated so the rising sun sits
+    // behind the samurai's hat in the opening shot.
+    const home = SHOTS[0];
+    const homeSubjectX = W * (0.5 + (W < 900 ? 0 : home.side));
+    let x = homeSubjectX - SUN_U * tileW + (az - home.az) * kx;
+    x = (((x % period) + period) % period) - 2 * period;
+
+    const horizonY = H / 2 - el * ky;
+    const y = horizonY - HORIZON_V * stripH;
+
+    // The rotating wrapper is inset -20% on every side.
+    backdropStrip.style.transform = `translate3d(${x + 0.2 * W}px, ${y + 0.2 * H}px, 0)`;
+    backdropRot.style.transform = `rotate(${bankRad}rad)`;
   }
 
+  // ----- Scene dressing -----
   function buildGround() {
     // No visible floor: the samurai stands on the page's own paper, and only
     // its shadow is drawn.
@@ -544,6 +552,8 @@ function runScene() {
     camera.fov = fov;
     camera.filmOffset = -side * 2 * Math.tan((fov * DEG) / 2) * camera.aspect * camera.getFilmWidth();
     camera.updateProjectionMatrix();
+
+    updateBackdrop(az, el, fov, reducedMotion ? 0 : bank);
 
     if (mixer) mixer.update(dt);
     for (const m of markers) anchorFns[m.userData.anchor](m.position);

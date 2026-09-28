@@ -20,6 +20,16 @@
     <button type="button" id="loader-skip" class="loader-skip">Skip to portfolio</button>
   </div>
 
+  <!-- Ink-wash mountain backdrop; three-scene.js pans it as the camera turns.
+       Alternating mirrored tiles make it repeat seamlessly. -->
+  <div id="backdrop" aria-hidden="true">
+    <div class="backdrop-rot">
+      <div class="backdrop-strip">
+        <span></span><span class="flip"></span><span></span><span class="flip"></span><span></span><span class="flip"></span>
+      </div>
+    </div>
+  </div>
+
   <!-- 3D Background Scene -->
   <canvas id="bg-canvas"></canvas>
 
