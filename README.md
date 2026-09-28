@@ -7,11 +7,11 @@ A samurai stands inside an ink-wash mountain painting. Each section of the portf
 | Section | Drone shot |
 |---|---|
 | Home | Low heroic angle, full body |
-| About | Close on the face and helmet |
-| Experience | Behind, on the katana across the back |
+| About | Up under the hat brim at the masked face |
+| Experience | Behind him, following the katana at his hip |
 | Projects | Down at the hands |
-| Skills | The chest armor |
-| Education | Top-down over the helmet crest |
+| Skills | The chest, scarf and sash |
+| Education | Top-down over the straw hat |
 | Contact | Pulled out to a wide shot |
 
 ## Features
