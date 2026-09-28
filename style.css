@@ -145,13 +145,15 @@ html, body {
   z-index: 1;
   pointer-events: none;
   opacity: 0.92;
-  transform-origin: 90% 10%;
+  transform: scaleX(-1);
+  transform-origin: 50% 10%;
   animation: branchSway 7s ease-in-out infinite;
 }
 
+/* Mirrored so the painting's cut-off trunk sits off-screen to the right. */
 @keyframes branchSway {
-  0%, 100% { transform: rotate(-1.2deg); }
-  50% { transform: rotate(1.4deg); }
+  0%, 100% { transform: scaleX(-1) rotate(-1.2deg); }
+  50% { transform: scaleX(-1) rotate(1.4deg); }
 }
 
 /* ===== FIXED UI ===== */
