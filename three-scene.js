@@ -117,6 +117,9 @@ function runScene() {
 
   // ----- Anchors: named points on the samurai the camera can aim at -----
   const anchorFns = {};
+  // The samurai's silhouette as a radius per height band, so falling petals
+  // can collide with it. Built from the model's geometry once it loads.
+  let bodyProfile = null;
   const modelSize = new THREE.Vector3(1.4, MODEL_HEIGHT, 0.9);
   setFallbackAnchors();
 
@@ -148,6 +151,26 @@ function runScene() {
       }
     });
     if (pts.length < 50) return;
+
+    // Collision profile: the 85th-percentile radius in each height band
+    // (ignores thin outliers like the katana), widened slightly toward its
+    // neighbours so petals can't slip through gaps between bands.
+    const N = 32;
+    const buckets = Array.from({ length: N }, () => []);
+    for (const p of pts) {
+      const k = Math.floor((p.y / H) * N);
+      if (k >= 0 && k < N) buckets[k].push(Math.hypot(p.x, p.z));
+    }
+    const raw = buckets.map((b) => (b.length ? b.sort((x, y) => x - y)[Math.floor(b.length * 0.85)] : 0));
+    const radius = raw.map((v, k) => 0.5 * v + 0.5 * Math.max(v, raw[k - 1] || 0, raw[k + 1] || 0));
+    let brim = N - 1;
+    for (let k = Math.floor(N * 0.75), best = 0; k < N; k++) {
+      if (radius[k] > best) {
+        best = radius[k];
+        brim = k;
+      }
+    }
+    bodyProfile = { N, H, radius, brim };
 
     const band = (lo, hi) => pts.filter((p) => p.y >= lo * H && p.y <= hi * H);
     const centroid = (arr) => arr.reduce((a, p) => a.add(p), new THREE.Vector3()).divideScalar(arr.length);
@@ -445,39 +468,101 @@ function runScene() {
       scene.add(mesh);
       meshes.push(mesh);
       for (let i = 0; i < perType; i++) {
-        state.push({
+        const p = {
           mesh,
           index: i,
-          pos: new THREE.Vector3((Math.random() - 0.5) * 24, Math.random() * 13 - 1, (Math.random() - 0.5) * 24),
+          pos: new THREE.Vector3(0, Math.random() * 13 - 1, 0),
           rot: new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6),
           spin: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(2),
           fall: 0.25 + Math.random() * 0.35,
           sway: 0.3 + Math.random() * 0.5,
           phase: Math.random() * Math.PI * 2,
           scale: 0.7 + Math.random() * 0.8,
-        });
+          touch: 1,
+        };
+        spawnXZ(p);
+        state.push(p);
       }
     }
     return { meshes, state, dummy: new THREE.Object3D() };
   }
 
-  function updatePetals(dt, elapsed) {
+  // About a third of the petals fall right around the samurai so they visibly
+  // land on him; the rest fill the wider scene.
+  function spawnXZ(p) {
+    if (Math.random() < 0.35) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * 1.0;
+      p.pos.x = Math.cos(a) * r;
+      p.pos.z = Math.sin(a) * r;
+    } else {
+      p.pos.x = (Math.random() - 0.5) * 24;
+      p.pos.z = (Math.random() - 0.5) * 24;
+    }
+  }
+
+  const sightDir = new THREE.Vector3();
+  const toPetal = new THREE.Vector3();
+
+  function updatePetals(dt, elapsed, camPos, lookAt) {
     const { state, dummy, meshes } = petals;
     const speed = reducedMotion ? 0.4 : 1;
+    sightDir.subVectors(lookAt, camPos);
+    const sightLen = sightDir.length();
+    sightDir.divideScalar(sightLen || 1);
+
+    let touching = 0;
     for (const p of state) {
-      p.pos.y -= p.fall * dt * speed;
-      p.pos.x += Math.sin(elapsed * 0.6 + p.phase) * p.sway * dt * speed;
-      if (p.pos.y < -1) p.pos.set((Math.random() - 0.5) * 24, 12, (Math.random() - 0.5) * 24);
-      p.rot.x += p.spin.x * dt * speed;
-      p.rot.y += p.spin.y * dt * speed;
-      p.rot.z += p.spin.z * dt * speed;
+      // `touch` < 1 while resting against the samurai slows the petal down.
+      p.pos.y -= p.fall * dt * speed * p.touch;
+      p.pos.x += Math.sin(elapsed * 0.6 + p.phase) * p.sway * dt * speed * p.touch;
+      if (p.pos.y < -1) {
+        p.pos.y = 12;
+        spawnXZ(p);
+      }
+
+      // Collide with the samurai: push the petal out to his surface. Height
+      // band by band it slides down the hat cone, lingers on the brim, then
+      // drops off the edge and brushes down the robes.
+      p.touch = 1;
+      if (bodyProfile && p.pos.y > 0 && p.pos.y < bodyProfile.H) {
+        const k = Math.min(bodyProfile.N - 1, Math.floor((p.pos.y / bodyProfile.H) * bodyProfile.N));
+        const r = bodyProfile.radius[k] + 0.03;
+        const d = Math.hypot(p.pos.x, p.pos.z);
+        // A thin contact skin keeps a petal "resting" once it's on the surface.
+        if (d < r + 0.02) {
+          if (d < 1e-4) p.pos.x = r;
+          else if (d < r) {
+            p.pos.x *= r / d;
+            p.pos.z *= r / d;
+          }
+          p.touch = k >= bodyProfile.brim - 1 ? 0.12 : 0.5;
+          touching++;
+        }
+      }
+
+      p.rot.x += p.spin.x * dt * speed * p.touch;
+      p.rot.y += p.spin.y * dt * speed * p.touch;
+      p.rot.z += p.spin.z * dt * speed * p.touch;
+
+      // Keep the view clear: petals shrink away right in front of the lens
+      // and inside a thin tube along the line of sight to the subject.
+      toPetal.subVectors(p.pos, camPos);
+      let vis = THREE.MathUtils.smoothstep(toPetal.length(), 0.8, 2.0);
+      const along = toPetal.dot(sightDir);
+      if (along > 0 && along < sightLen - 0.3) {
+        const perp = toPetal.addScaledVector(sightDir, -along).length();
+        vis *= THREE.MathUtils.smoothstep(perp, 0.25, 0.6);
+      }
+
       dummy.position.copy(p.pos);
       dummy.rotation.copy(p.rot);
-      dummy.scale.setScalar(p.scale);
+      dummy.scale.setScalar(p.scale * vis);
       dummy.updateMatrix();
       p.mesh.setMatrixAt(p.index, dummy.matrix);
     }
     for (const m of meshes) m.instanceMatrix.needsUpdate = true;
+    if (DEBUG_ANCHORS) window.__petalsTouching = touching;
   }
 
   // ----- Scroll -> shot mapping -----
@@ -635,7 +720,7 @@ function runScene() {
 
     if (mixer) mixer.update(dt);
     for (const m of markers) anchorFns[m.userData.anchor](m.position);
-    updatePetals(dt, elapsed);
+    updatePetals(dt, elapsed, camera.position, target);
     renderer.render(scene, camera);
   }
   animate();
