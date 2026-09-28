@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deepak Meena - Software Development Engineer (.NET / Angular / Azure)</title>
+  <meta name="description" content="Deepak Meena — Full-Stack Software Development Engineer specializing in .NET, Angular, and Azure. An interactive 3D samurai portfolio." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 3D Background Scene -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Contrast Overlay -->
+  <div class="video-overlay"></div>
+
+  <!-- Scroll Progress Bar -->
+  <div class="scroll-progress"></div>
+
+  <!-- Enhanced Fixed UI Elements -->
+  <div class="logo" title="Deepak Meena">
+    <svg viewBox="0 0 100 100" class="logo-mark" aria-hidden="true">
+      <circle cx="50" cy="50" r="47" class="logo-ring" />
+      <g transform="translate(50 50) rotate(-45)">
+        <rect x="-3" y="-38" width="6" height="52" rx="2.5" class="logo-blade" />
+        <rect x="-3" y="-38" width="2.4" height="52" rx="1.2" class="logo-blade-edge" />
+        <rect x="-13" y="12" width="26" height="5" rx="2" class="logo-guard" />
+        <rect x="-4" y="16" width="8" height="16" rx="2" class="logo-hilt" />
+      </g>
+    </svg>
+  </div>
+
+  <div class="social">
+    <div class="social-line"></div>
+    <a href="https://www.linkedin.com/in/deepak-meena-734b9625b" target="_blank" rel="noopener" class="social-icon" title="LinkedIn">
+      <i class="fab fa-linkedin-in"></i>
+    </a>
+    <a href="https://github.com/DeepakMeena222187" target="_blank" rel="noopener" class="social-icon" title="GitHub">
+      <i class="fab fa-github"></i>
+    </a>
+    <a href="mailto:deepaksingh1712000@gmail.com" class="social-icon" title="Email">
+      <i class="fas fa-envelope"></i>
+    </a>
+    <a href="tel:+916396513103" class="social-icon" title="Phone">
+      <i class="fas fa-phone"></i>
+    </a>
+    <div class="social-line"></div>
+  </div>
+
+  <div class="navbar">
+    <a href="#home">Home</a>
+    <a href="#about">About</a>
+    <a href="#experience">Experience</a>
+    <a href="#projects">Projects</a>
+    <a href="#skills">Skills</a>
+    <a href="#education">Education</a>
+    <a href="#contact">Contact</a>
+  </div>
+
+  <div class="quote">
+    <i class="fas fa-quote-left quote-icon"></i>
+    <p>"The blade and the codebase are sharpened the same way — one deliberate stroke at a time."</p>
+    <div class="quote-author">— Sia (AI)</div>
+  </div>
+
+  <!-- Hero Section -->
+  <section id="home" class="hero">
+    <div class="hero-content">
+      <div class="hero-eyebrow">武士道 &middot; The Way of the Engineer</div>
+      <h1>Deepak Meena</h1>
+      <div class="subtitle">Software Development Engineer — Full-Stack (.NET / Angular / Azure)</div>
+      <div class="typing-text" id="typing-text"></div>
+      <div class="cta-buttons">
+        <a href="#projects" class="cta-btn">
+          <i class="fas fa-code"></i> View Projects
+        </a>
+        <a href="Deepak_Meena_Resume.pdf" class="cta-btn" download>
+          <i class="fas fa-file-arrow-down"></i> Download Resume
+        </a>
+        <a href="#contact" class="cta-btn">
+          <i class="fas fa-envelope"></i> Get In Touch
+        </a>
+        <a href="https://github.com/DeepakMeena222187" target="_blank" rel="noopener" class="cta-btn">
+          <i class="fab fa-github"></i> GitHub Profile
+        </a>
+      </div>
+      <div class="scroll-cue" aria-hidden="true">
+        <i class="fas fa-chevron-down"></i>
+      </div>
+    </div>
+  </section>
+
+  <!-- About Section -->
+  <section id="about" class="section revealed">
+    <h2>About Me</h2>
+    <div class="about-content">
+      <div class="about-text">
+        <p>
+          I'm <strong>Deepak Meena</strong>, a final-year B.Tech CSE student at Amity University, Greater Noida (graduating 2026), and a full-stack developer who has already shipped production software to <strong>Azure</strong>.
+        </p>
+        <p>
+          Through Thinkbridge Academy's Full-Stack .NET Engineering Program, I built and deployed a <strong>.NET 10 + Angular 21</strong> system end-to-end — managed-identity authentication with zero stored credentials, event-driven messaging via <strong>Azure Service Bus</strong>, and a frontend scoring <strong>Lighthouse 97/100/100/100</strong>. I care as much about catching a pre-deployment security defect as I do about shaving 93% off a bundle size.
+        </p>
+        <p>
+          My stack spans <strong>C#, TypeScript, JavaScript, SQL, and Python</strong> across .NET, Angular, React, and Azure — and I'm looking for SDE roles where production ownership starts on day one.
+        </p>
+        <div class="contact-details">
+          <p><strong>Location:</strong> Greater Noida, Uttar Pradesh, India</p>
+          <p><strong>Email:</strong> deepaksingh1712000@gmail.com</p>
+          <p><strong>Phone:</strong> +91 6396513103</p>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-number">7.51</span>
+          <div class="stat-label">CGPA — B.Tech CSE</div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">97/100/100/100</span>
+          <div class="stat-label">Lighthouse Score (Live App)</div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">93%</span>
+          <div class="stat-label">Bundle Size Reduction</div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">3+</span>
+          <div class="stat-label">Production Apps Shipped</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Experience Section -->
+  <section id="experience" class="section revealed">
+    <h2>Experience</h2>
+    <div class="experience-grid">
+      <div class="experience-card">
+        <div class="experience-header">
+          <h3 class="experience-role">Full-Stack .NET Engineering Program</h3>
+          <span class="experience-company">Thinkbridge Academy · Thinkschooler</span>
+          <span class="experience-date">2026</span>
+        </div>
+        <p class="experience-summary">
+          Structured production-engineering program building one continuously deployed application (.NET 10 API + Angular 21 SPA + Azure SQL), delivered through agent-assisted development with independent verification of every result.
+        </p>
+        <ul class="experience-list">
+          <li>Deployed a .NET API to Azure App Service authenticating to Azure SQL via <strong>system-assigned managed identity</strong> — zero stored credentials, verified at the database session level.</li>
+          <li>Built CI/CD on GitHub Actions using <strong>OIDC federation</strong> with no stored secrets, adding a post-deploy check that asserts live URLs — catching a deploy that reported success while leaving the site broken.</li>
+          <li>Cut the Angular initial bundle <strong>93% (121.8 kB → 8.8 kB)</strong>, achieving <strong>Lighthouse 97/100/100/100</strong> on the live deployment.</li>
+          <li>Implemented Azure Service Bus topic fan-out with idempotent, competing-consumer workers — verified exactly-once processing and poison-message dead-lettering after 3 attempts.</li>
+          <li>Built a bounded-channel background service with graceful shutdown, proving both the successful-drain and grace-period-exceeded paths against a live database.</li>
+          <li>Caught a pre-deployment security defect — an unguarded seeder that would have created a known-password admin account in production — rotated the credential and documented the exposure.</li>
+        </ul>
+      </div>
+
+      <div class="experience-card">
+        <div class="experience-header">
+          <h3 class="experience-role">Web Development Intern</h3>
+          <span class="experience-company">Prodigy InfoTech · Remote</span>
+          <span class="experience-date">May 2025 – Jun 2025</span>
+        </div>
+        <ul class="experience-list">
+          <li>Shipped 3 production frontend applications from design to live deployment within a one-month window, using HTML5/CSS3/ES6+ with GitHub–Netlify CI/CD.</li>
+          <li>Reduced UI code duplication across builds via component-based architecture and DRY principles; verified consistent rendering across mobile and desktop through cross-device testing.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Projects Section -->
+  <section id="projects" class="section revealed">
+    <h2>Featured Projects</h2>
+    <div class="projects-grid">
+      <div class="project-card">
+        <div class="project-header">
+          <h3 class="project-title">QuoteSearch — Cloud-Deployed Full-Stack App</h3>
+          <p class="project-description">
+            Event-driven quote management system deployed end-to-end on Azure. API on App Service authenticating to Azure SQL by managed identity with no stored credentials; Angular SPA on static website hosting scoring Lighthouse 97/100/100/100, with an asynchronous audit pipeline over Azure Service Bus.
+          </p>
+        </div>
+        <div class="project-tech">
+          <span class="tech-tag">.NET 10</span>
+          <span class="tech-tag">Angular 21</span>
+          <span class="tech-tag">Azure SQL</span>
+          <span class="tech-tag">Azure Service Bus</span>
+          <span class="tech-tag">Managed Identity</span>
+          <span class="tech-tag">GitHub Actions</span>
+        </div>
+        <div class="project-links">
+          <a href="https://quotesapiday17web.z29.web.core.windows.net" target="_blank" rel="noopener" class="project-link">
+            <i class="fas fa-external-link-alt"></i> Live Demo
+          </a>
+        </div>
+      </div>
+
+      <div class="project-card">
+        <div class="project-header">
+          <h3 class="project-title">SpendSmart — Expense Tracker PWA</h3>
+          <p class="project-description">
+            Full-stack personal finance PWA with real-time Firestore sync and installable offline access. Google Sign-In with UID-scoped Firestore security rules, budget-overspend alerts, and interactive category-spend visualizations, deployed via automated CI/CD.
+          </p>
+        </div>
+        <div class="project-tech">
+          <span class="tech-tag">React.js</span>
+          <span class="tech-tag">Firebase</span>
+          <span class="tech-tag">Recharts</span>
+          <span class="tech-tag">Vite</span>
+          <span class="tech-tag">Netlify</span>
+        </div>
+      </div>
+
+      <div class="project-card">
+        <div class="project-header">
+          <h3 class="project-title">Customer Sales Analysis System</h3>
+          <p class="project-description">
+            Improved query performance an estimated 35–40% by indexing and profiling queries across a normalized 8-table schema using joins, views, subqueries, and window functions.
+          </p>
+        </div>
+        <div class="project-tech">
+          <span class="tech-tag">MySQL</span>
+          <span class="tech-tag">SQL</span>
+          <span class="tech-tag">Query Optimization</span>
+          <span class="tech-tag">Window Functions</span>
+        </div>
+      </div>
+
+      <div class="project-card">
+        <div class="project-header">
+          <h3 class="project-title">Sing-it: Indie Karaoke</h3>
+          <p class="project-description">
+            An innovative karaoke application with an Indian music focus, featuring real-time lyrics synchronization and Web Audio API-based processing.
+          </p>
+        </div>
+        <div class="project-tech">
+          <span class="tech-tag">JavaScript</span>
+          <span class="tech-tag">HTML5</span>
+          <span class="tech-tag">CSS3</span>
+          <span class="tech-tag">Web Audio API</span>
+        </div>
+        <div class="project-links">
+          <a href="https://github.com/DeepakMeena222187/Sing-it-----Indie-Karaoke-with-Indian" target="_blank" rel="noopener" class="project-link">
+            <i class="fab fa-github"></i> GitHub
+          </a>
+          <a href="https://singit222187.netlify.app/" target="_blank" rel="noopener" class="project-link">
+            <i class="fas fa-external-link-alt"></i> Live Demo
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Skills Section -->
+  <section id="skills" class="section revealed">
+    <h2>Technical Skills</h2>
+    <div class="skills-container">
+      <div class="skill-category">
+        <h3><i class="fas fa-code"></i> Languages</h3>
+        <div class="skill-chips">
+          <span class="skill-chip">C#</span>
+          <span class="skill-chip">TypeScript</span>
+          <span class="skill-chip">JavaScript</span>
+          <span class="skill-chip">SQL</span>
+          <span class="skill-chip">Python</span>
+        </div>
+      </div>
+
+      <div class="skill-category">
+        <h3><i class="fas fa-server"></i> Backend</h3>
+        <div class="skill-chips">
+          <span class="skill-chip">.NET 10</span>
+          <span class="skill-chip">ASP.NET Core Minimal APIs</span>
+          <span class="skill-chip">Entity Framework Core</span>
+          <span class="skill-chip">REST APIs</span>
+          <span class="skill-chip">JWT Authentication</span>
+          <span class="skill-chip">Background Services</span>
+        </div>
+      </div>
+
+      <div class="skill-category">
+        <h3><i class="fas fa-display"></i> Frontend</h3>
+        <div class="skill-chips">
+          <span class="skill-chip">Angular 21 (Signals)</span>
+          <span class="skill-chip">Standalone Components</span>
+          <span class="skill-chip">React.js</span>
+          <span class="skill-chip">RxJS</span>
+          <span class="skill-chip">Reactive Forms</span>
+          <span class="skill-chip">WCAG 2.1 AA</span>
+        </div>
+      </div>
+
+      <div class="skill-category">
+        <h3><i class="fas fa-cloud"></i> Cloud &amp; DevOps</h3>
+        <div class="skill-chips">
+          <span class="skill-chip">Azure App Service</span>
+          <span class="skill-chip">Azure SQL</span>
+          <span class="skill-chip">Azure Service Bus</span>
+          <span class="skill-chip">Managed Identity</span>
+          <span class="skill-chip">GitHub Actions CI/CD</span>
+          <span class="skill-chip">Firebase</span>
+        </div>
+      </div>
+
+      <div class="skill-category">
+        <h3><i class="fas fa-database"></i> Databases</h3>
+        <div class="skill-chips">
+          <span class="skill-chip">SQL Server</span>
+          <span class="skill-chip">MySQL</span>
+          <span class="skill-chip">Query Indexing &amp; Profiling</span>
+          <span class="skill-chip">Window Functions</span>
+        </div>
+      </div>
+
+      <div class="skill-category">
+        <h3><i class="fas fa-toolbox"></i> Tools</h3>
+        <div class="skill-chips">
+          <span class="skill-chip">Git / GitHub</span>
+          <span class="skill-chip">Serilog</span>
+          <span class="skill-chip">Power BI</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Education Section -->
+  <section id="education" class="section revealed">
+    <h2>Education &amp; Certifications</h2>
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <h3>B.Tech in Computer Science Engineering</h3>
+          <div class="timeline-date">2022 - 2026</div>
+          <div class="timeline-location">Amity School of Engineering & Technology, Noida</div>
+          <p>CGPA: 7.51 / 10.0 (Final Year)</p>
+          <div class="achievements">
+            <span class="achievement-tag">Data Structures &amp; Algorithms</span>
+            <span class="achievement-tag">OOP</span>
+            <span class="achievement-tag">DBMS</span>
+            <span class="achievement-tag">Operating Systems</span>
+            <span class="achievement-tag">Computer Networks</span>
+            <span class="achievement-tag">Software Engineering</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <h3>Senior Secondary (Class XII)</h3>
+          <div class="timeline-date">2021</div>
+          <div class="timeline-location">Pragyan Public School, Jewar - CBSE</div>
+          <p>Percentage: 80%</p>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <h3>Secondary (Class X)</h3>
+          <div class="timeline-date">2019</div>
+          <div class="timeline-location">Pragyan Public School, Jewar - CBSE</div>
+          <p>Percentage: 83%</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="certifications">
+      <h3>Certifications</h3>
+      <div class="cert-grid">
+        <div class="cert-card">
+          <i class="fas fa-robot"></i>
+          <h4>Python for Data Science</h4>
+          <p>Coincent, in association with Robotics Club, IIT Guwahati</p>
+          <span class="cert-date">2023</span>
+        </div>
+        <div class="cert-card">
+          <i class="fas fa-code"></i>
+          <h4>Web Development</h4>
+          <p>Prodigy InfoTech</p>
+          <span class="cert-date">2025</span>
+        </div>
+        <div class="cert-card">
+          <i class="fas fa-network-wired"></i>
+          <h4>Cisco Networking</h4>
+          <p>Cisco Networking Academy</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact Section -->
+  <section id="contact" class="section revealed">
+    <h2>Get In Touch</h2>
+    <div class="contact-container">
+      <div class="contact-info">
+        <div class="contact-item">
+          <div class="contact-icon">
+            <i class="fas fa-envelope"></i>
+          </div>
+          <div>
+            <h4>Email</h4>
+            <p>deepaksingh1712000@gmail.com</p>
+          </div>
+        </div>
+
+        <div class="contact-item">
+          <div class="contact-icon">
+            <i class="fas fa-phone"></i>
+          </div>
+          <div>
+            <h4>Phone</h4>
+            <p>+91 6396513103</p>
+          </div>
+        </div>
+
+        <div class="contact-item">
+          <div class="contact-icon">
+            <i class="fas fa-map-marker-alt"></i>
+          </div>
+          <div>
+            <h4>Location</h4>
+            <p>Greater Noida, UP, India</p>
+          </div>
+        </div>
+
+        <div class="contact-item">
+          <div class="contact-icon">
+            <i class="fab fa-linkedin"></i>
+          </div>
+          <div>
+            <h4>LinkedIn</h4>
+            <a href="https://www.linkedin.com/in/deepak-meena-734b9625b" target="_blank" rel="noopener" class="linkedin-link">Connect with me</a>
+          </div>
+        </div>
+
+        <div class="contact-item">
+          <div class="contact-icon">
+            <i class="fas fa-file-arrow-down"></i>
+          </div>
+          <div>
+            <h4>Resume</h4>
+            <a href="Deepak_Meena_Resume.pdf" class="linkedin-link" download>Download PDF</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="contact-form">
+        <form id="contact-form">
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" required>
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+          </div>
+
+          <div class="form-group">
+            <label for="subject">Subject</label>
+            <input type="text" id="subject" name="subject" required>
+          </div>
+
+          <div class="form-group">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" rows="5" required></textarea>
+          </div>
+
+          <button type="submit" class="form-submit">
+            <i class="fas fa-paper-plane"></i> Send Message
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <script src="script.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+  <script type="module" src="three-scene.js"></script>
+</body>
+</html>
