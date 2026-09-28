@@ -11,7 +11,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-const MODEL_URL = 'assets/samurai.glb';
+const MODEL_URL = 'assets/ronin.glb';
 const MODEL_HEIGHT = 3.2;
 // Extra rotation (degrees) so the model faces +Z, if it doesn't out of the box.
 const MODEL_YAW_DEG = 0;
@@ -25,10 +25,10 @@ const DEBUG_ANCHORS = new URLSearchParams(window.location.search).has('anchors')
 // negative = left half.
 const SHOTS = [
   { id: 'home', anchor: 'body', az: 18, el: -4, dist: 7.6, fov: 38, side: 0.24 },
-  { id: 'about', anchor: 'head', az: 28, el: 4, dist: 2.1, fov: 34, side: 0.24 },
-  { id: 'experience', anchor: 'back', az: 158, el: 14, dist: 2.6, fov: 38, side: -0.24 },
-  { id: 'projects', anchor: 'rightHand', az: -58, el: 12, dist: 1.8, fov: 36, side: 0.24 },
-  { id: 'skills', anchor: 'chest', az: 32, el: 2, dist: 2.4, fov: 36, side: -0.24 },
+  { id: 'about', anchor: 'head', az: 22, el: -8, dist: 2.0, fov: 34, side: 0.24 },
+  { id: 'experience', anchor: 'katana', az: 140, el: 10, dist: 3.2, fov: 44, side: -0.24 },
+  { id: 'projects', anchor: 'rightHand', az: -55, el: 10, dist: 1.7, fov: 36, side: 0.24 },
+  { id: 'skills', anchor: 'chest', az: 32, el: 2, dist: 2.7, fov: 36, side: -0.26 },
   { id: 'education', anchor: 'crest', az: 12, el: 58, dist: 2.4, fov: 38, side: 0.24 },
   { id: 'contact', anchor: 'body', az: -24, el: 8, dist: 10, fov: 40, side: -0.2 },
 ];
@@ -145,10 +145,12 @@ function runScene() {
     const centroid = (arr) => arr.reduce((a, p) => a.add(p), new THREE.Vector3()).divideScalar(arr.length);
     const median = (arr) => arr.slice().sort((a, b) => a - b)[Math.floor(arr.length / 2)];
 
-    const top = band(0.84, 1.0);
-    if (top.length) {
-      const c = centroid(top);
-      anchorFns.head = staticAnchor(c.x, median(top.map((p) => p.y)), c.z);
+    // Only points near the vertical axis, so a hat brim or helmet crest
+    // doesn't pull the target away from the face.
+    const headPts = band(0.8, 0.95).filter((p) => Math.hypot(p.x, p.z) < 0.07 * H);
+    if (headPts.length) {
+      const c = centroid(headPts);
+      anchorFns.head = staticAnchor(c.x, median(headPts.map((p) => p.y)), c.z + 0.02 * H);
     }
     const peak = band(0.97, 1.0);
     if (peak.length) {
@@ -164,10 +166,24 @@ function runScene() {
       anchorFns.chest = staticAnchor(c.x, c.y, c.z + (zMax - c.z) * 0.6);
       anchorFns.back = staticAnchor(c.x, c.y, zMin + (c.z - zMin) * 0.2);
     }
-    const arms = band(0.15, 0.65).sort((a, b) => a.x - b.x);
+    // Hands hang around mid-height; a narrow band keeps flared robes out.
+    const arms = band(0.44, 0.6).sort((a, b) => a.x - b.x);
     if (arms.length) {
       const hand = centroid(arms.slice(0, Math.max(8, Math.floor(arms.length * 0.02))));
       anchorFns.rightHand = staticAnchor(hand.x, hand.y, hand.z);
+    }
+
+    // Katana worn at the left hip: its scabbard tip is the farthest point on
+    // the left side below the waist. Aim at the upper back, nudged toward the
+    // blade, so a wide shot holds the hat, the back and the whole scabbard.
+    const leftSide = band(0.25, 0.6).filter((p) => p.x > 0).sort((a, b) => b.x - a.x);
+    const waist = band(0.45, 0.55);
+    if (leftSide.length && waist.length) {
+      const tip = centroid(leftSide.slice(0, Math.max(8, Math.floor(leftSide.length * 0.02))));
+      const w = centroid(waist);
+      const zMin = Math.min(...waist.map((p) => p.z));
+      const hipBackZ = zMin * 0.6 + w.z * 0.4;
+      anchorFns.katana = staticAnchor(THREE.MathUtils.lerp(w.x, tip.x, 0.25), 0.6 * H, hipBackZ);
     }
   }
 
@@ -179,6 +195,7 @@ function runScene() {
     anchorFns.crest = staticAnchor(0, 1.0 * H, 0);
     anchorFns.chest = staticAnchor(0, 0.7 * H, 0.15 * D);
     anchorFns.back = staticAnchor(0, 0.68 * H, -0.5 * D);
+    anchorFns.katana = staticAnchor(0.3 * W, 0.45 * H, -0.3 * D);
     anchorFns.rightHand = staticAnchor(-0.4 * W, 0.5 * H, 0.1 * D);
   }
 

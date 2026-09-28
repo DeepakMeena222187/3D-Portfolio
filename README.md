@@ -16,7 +16,7 @@ A samurai stands inside an ink-wash mountain painting. Each section of the portf
 
 ## Features
 
-- **Real 3D model** (`assets/samurai.glb`), scaled and centered automatically
+- **Real 3D model** (`assets/ronin.glb`, a ronin generated with Haimeta), scaled and centered automatically
 - **Body-part targeting**: uses the model's skeleton when it has one; otherwise reads the mesh geometry to find the head, hands, chest and back, so unrigged AI-generated models work too
 - **Drone camera**: each section holds its shot while its panel is on screen; the camera flies to the next shot through the open space between panels
 - **Ink-wash world**: the mountain painting wraps the whole scene, the samurai casts a soft shadow onto the page's paper, and falling petals are cut from a real sakura painting
@@ -26,7 +26,7 @@ A samurai stands inside an ink-wash mountain painting. Each section of the portf
 
 ## Adding or changing the model
 
-1. Put a `.glb` file at `assets/samurai.glb`. Any size up to about 25 MB works; larger files load slower.
+1. Put a `.glb` file in `assets/` and point `MODEL_URL` at the top of `three-scene.js` to it. Any size up to about 25 MB works; larger files load slower.
 2. Open the site with `?anchors` in the URL (for example `http://localhost:8000/?anchors`) to see a blue dot on each detected body part.
 3. If the model faces the wrong way, set `MODEL_YAW_DEG` at the top of `three-scene.js` (for example `180`).
 4. Shot angles and distances live in the `SHOTS` table in the same file.
