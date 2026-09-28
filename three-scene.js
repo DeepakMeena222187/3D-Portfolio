@@ -358,7 +358,7 @@ function runScene() {
   const SUN_U = 0.8325; // the rising sun's centre, as a fraction across the painting
   const HORIZON_V = 0.7; // lake/mountain line, as a fraction down the painting
 
-  function updateBackdrop(az, el, fov, bankRad) {
+  function updateBackdrop(az, el, fov, bankRad, shiftX = 0, shiftY = 0) {
     if (!backdropStrip) return;
     const W = window.innerWidth;
     const H = window.innerHeight;
@@ -373,10 +373,10 @@ function runScene() {
     // behind the samurai's hat in the opening shot.
     const home = SHOTS[0];
     const homeSubjectX = W * (0.5 + (W < 900 ? 0 : home.side));
-    let x = homeSubjectX - SUN_U * tileW + (az - home.az) * kx;
+    let x = homeSubjectX - SUN_U * tileW + (az - home.az) * kx + shiftX;
     x = (((x % period) + period) % period) - 2 * period;
 
-    const horizonY = H / 2 - el * ky;
+    const horizonY = H / 2 - el * ky + shiftY;
     const y = horizonY - HORIZON_V * stripH;
 
     // The rotating wrapper is inset -20% on every side.
@@ -546,6 +546,12 @@ function runScene() {
   const vb = new THREE.Vector3();
   const target = new THREE.Vector3();
   const dir = new THREE.Vector3();
+  const camRight = new THREE.Vector3();
+  const camUp = new THREE.Vector3();
+  const mouseS = { x: 0, y: 0 };
+  const PARALLAX_X = 0.045;
+  const PARALLAX_Y = 0.03;
+  const BACKDROP_DEPTH = 0.35;
   let g = scrollToShot(window.scrollY);
   let prevAz = null;
   let bank = 0;
@@ -579,8 +585,11 @@ function runScene() {
     const fov = THREE.MathUtils.lerp(A.fov, B.fov, t);
     const side = window.innerWidth < 900 ? 0 : THREE.MathUtils.lerp(A.side, B.side, t);
 
-    az += mouse.x * 3;
-    el = THREE.MathUtils.clamp(el - mouse.y * 2, -20, 80);
+    // One smoothed mouse value drives both the 3D camera and the backdrop, so
+    // the two layers ease with exactly the same curve.
+    const ease = 1 - Math.exp(-4 * dt);
+    mouseS.x += (mouse.x - mouseS.x) * ease;
+    mouseS.y += (mouse.y - mouseS.y) * ease;
 
     const azR = az * DEG;
     const elR = el * DEG;
@@ -588,6 +597,18 @@ function runScene() {
     camera.position.copy(target).addScaledVector(dir, dist);
     camera.up.set(0, 1, 0);
     camera.lookAt(target);
+
+    // Hover parallax: slide the camera sideways without turning it, so the
+    // near samurai shifts on screen more than the far backdrop (which follows
+    // at BACKDROP_DEPTH of the samurai's shift, in the same direction).
+    camRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    camera.position
+      .addScaledVector(camRight, mouseS.x * PARALLAX_X * dist)
+      .addScaledVector(camUp, -mouseS.y * PARALLAX_Y * dist);
+    const focalPx = window.innerHeight / 2 / Math.tan((fov * DEG) / 2);
+    const subjectShiftX = -mouseS.x * PARALLAX_X * focalPx;
+    const subjectShiftY = -mouseS.y * PARALLAX_Y * focalPx;
 
     // Bank into horizontal sweeps like a drone turning.
     if (prevAz !== null && dt > 0 && !reducedMotion) {
@@ -603,7 +624,14 @@ function runScene() {
     camera.filmOffset = -side * 2 * Math.tan((fov * DEG) / 2) * camera.aspect * camera.getFilmWidth();
     camera.updateProjectionMatrix();
 
-    updateBackdrop(az, el, fov, reducedMotion ? 0 : bank);
+    updateBackdrop(
+      az,
+      el,
+      fov,
+      reducedMotion ? 0 : bank,
+      subjectShiftX * BACKDROP_DEPTH,
+      subjectShiftY * BACKDROP_DEPTH
+    );
 
     if (mixer) mixer.update(dt);
     for (const m of markers) anchorFns[m.userData.anchor](m.position);
