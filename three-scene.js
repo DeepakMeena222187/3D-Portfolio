@@ -12,6 +12,13 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const MODEL_URL = 'assets/ronin.glb';
+// Sharpened 4K colour texture and a fine-detail bump map for this model, made
+// from its own 2K texture. Loaded after the model shows, so it sharpens in
+// place. Set to null when switching to a model without them.
+const MODEL_HD_TEXTURES = {
+  color: 'assets/ronin-color-4k.webp',
+  detail: 'assets/ronin-detail.webp',
+};
 const MODEL_HEIGHT = 3.2;
 // Extra rotation (degrees) so the model faces +Z, if it doesn't out of the box.
 const MODEL_YAW_DEG = 0;
@@ -63,7 +70,9 @@ function runScene() {
   const DEG = Math.PI / 180;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  // Renders at least 1.5x internally (supersampling) for crisper textures,
+  // capped at 2x for performance.
+  renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio || 1, 1.5), 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -238,6 +247,46 @@ function runScene() {
     }
   }
 
+  // Sharpest texture filtering, a hint of cloth sheen, then the HD textures.
+  function upgradeMaterials(model) {
+    const maxAniso = renderer.capabilities.getMaxAnisotropy();
+    const materials = [];
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+        if (m.map) m.map.anisotropy = maxAniso;
+        // AI exports often ship with zero specular, which reads as clay.
+        if ('specularIntensity' in m && m.specularIntensity === 0) m.specularIntensity = 0.35;
+        if (m.roughness === 1) m.roughness = 0.8;
+        materials.push(m);
+      }
+    });
+    if (!MODEL_HD_TEXTURES) return;
+
+    const prep = (tex, srgb) => {
+      tex.flipY = false; // glTF UV convention
+      tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = maxAniso;
+      return tex;
+    };
+    texLoader.load(MODEL_HD_TEXTURES.color, (tex) => {
+      prep(tex, true);
+      for (const m of materials) {
+        m.map = tex;
+        m.needsUpdate = true;
+      }
+    });
+    texLoader.load(MODEL_HD_TEXTURES.detail, (tex) => {
+      prep(tex, false);
+      for (const m of materials) {
+        m.bumpMap = tex;
+        m.bumpScale = 0.85;
+        m.needsUpdate = true;
+      }
+    });
+  }
+
   // ----- Model -----
   let mixer = null;
 
@@ -269,6 +318,7 @@ function runScene() {
           o.receiveShadow = true;
         }
       });
+      upgradeMaterials(model);
 
       samurai.add(model);
       setFallbackAnchors();
