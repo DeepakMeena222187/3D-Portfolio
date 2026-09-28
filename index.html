@@ -12,11 +12,21 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Loading screen, shown while the samurai model downloads -->
+  <div id="loader" role="status" aria-live="polite">
+    <div class="loader-kanji">武士道</div>
+    <div class="loader-label">Summoning the samurai&hellip;</div>
+    <div class="loader-bar"><span id="loader-fill"></span></div>
+    <button type="button" id="loader-skip" class="loader-skip">Skip to portfolio</button>
+  </div>
+
   <!-- 3D Background Scene -->
   <canvas id="bg-canvas"></canvas>
 
-  <!-- Contrast Overlay -->
+  <!-- Edge vignette -->
   <div class="video-overlay"></div>
+
+  <img src="assets/sakura.webp" class="sakura-branch" alt="" aria-hidden="true" />
 
   <!-- Scroll Progress Bar -->
   <div class="scroll-progress"></div>
@@ -61,12 +71,6 @@
     <a href="#contact">Contact</a>
   </div>
 
-  <div class="quote">
-    <i class="fas fa-quote-left quote-icon"></i>
-    <p>"The blade and the codebase are sharpened the same way — one deliberate stroke at a time."</p>
-    <div class="quote-author">— Sia (AI)</div>
-  </div>
-
   <!-- Hero Section -->
   <section id="home" class="hero">
     <div class="hero-content">
@@ -88,14 +92,16 @@
           <i class="fab fa-github"></i> GitHub Profile
         </a>
       </div>
+      <p class="hero-quote">&ldquo;The blade and the codebase are sharpened the same way &mdash; one deliberate stroke at a time.&rdquo;</p>
       <div class="scroll-cue" aria-hidden="true">
+        <span>Scroll to explore</span>
         <i class="fas fa-chevron-down"></i>
       </div>
     </div>
   </section>
 
   <!-- About Section -->
-  <section id="about" class="section revealed">
+  <section id="about" class="section panel-left revealed">
     <h2>About Me</h2>
     <div class="about-content">
       <div class="about-text">
@@ -136,7 +142,7 @@
   </section>
 
   <!-- Experience Section -->
-  <section id="experience" class="section revealed">
+  <section id="experience" class="section panel-right revealed">
     <h2>Experience</h2>
     <div class="experience-grid">
       <div class="experience-card">
@@ -173,7 +179,7 @@
   </section>
 
   <!-- Projects Section -->
-  <section id="projects" class="section revealed">
+  <section id="projects" class="section panel-left revealed">
     <h2>Featured Projects</h2>
     <div class="projects-grid">
       <div class="project-card">
@@ -255,7 +261,7 @@
   </section>
 
   <!-- Skills Section -->
-  <section id="skills" class="section revealed">
+  <section id="skills" class="section panel-right revealed">
     <h2>Technical Skills</h2>
     <div class="skills-container">
       <div class="skill-category">
@@ -327,7 +333,7 @@
   </section>
 
   <!-- Education Section -->
-  <section id="education" class="section revealed">
+  <section id="education" class="section panel-left revealed">
     <h2>Education &amp; Certifications</h2>
     <div class="timeline">
       <div class="timeline-item">
@@ -394,7 +400,7 @@
   </section>
 
   <!-- Contact Section -->
-  <section id="contact" class="section revealed">
+  <section id="contact" class="section panel-right revealed">
     <h2>Get In Touch</h2>
     <div class="contact-container">
       <div class="contact-info">
@@ -483,7 +489,8 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
       }
     }
   </script>

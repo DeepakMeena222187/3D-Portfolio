@@ -1,3 +1,27 @@
+// ===== LOADING SCREEN =====
+// Driven by three-scene.js; lives here so the page still unlocks if the 3D
+// module never loads (blocked CDN, old browser).
+(function setupLoader() {
+  const loader = document.getElementById('loader');
+  if (!loader) return;
+  const fill = document.getElementById('loader-fill');
+  const skip = document.getElementById('loader-skip');
+  let hidden = false;
+
+  window.__hideLoader = function () {
+    if (hidden) return;
+    hidden = true;
+    loader.classList.add('is-hidden');
+  };
+  window.__setLoaderProgress = function (p) {
+    if (fill) fill.style.width = Math.round(Math.min(Math.max(p, 0), 1) * 100) + '%';
+  };
+
+  skip.addEventListener('click', window.__hideLoader);
+  setTimeout(() => skip.classList.add('is-visible'), 3500);
+  setTimeout(window.__hideLoader, 25000);
+})();
+
 // ===== TYPING ANIMATION =====
 const texts = [
   'Shipping production apps to Azure...',
@@ -164,16 +188,15 @@ function showNotification(message, type = 'info') {
 
 // ===== NAVBAR ACTIVE LINK HIGHLIGHTING =====
 function updateActiveNavLink() {
-  const sections = document.querySelectorAll('.section, .hero');
+  const sections = document.querySelectorAll('.hero, .section');
   const navLinks = document.querySelectorAll('.navbar a');
-  
-  let currentSection = '';
-  
+
+  // The last section whose top has passed the middle of the screen stays
+  // active through the open gap after it.
+  let currentSection = 'home';
+  const mid = window.innerHeight * 0.5;
   sections.forEach(section => {
-    const sectionTop = section.getBoundingClientRect().top;
-    const sectionHeight = section.offsetHeight;
-    
-    if (sectionTop <= 100 && sectionTop + sectionHeight > 100) {
+    if (section.getBoundingClientRect().top <= mid) {
       currentSection = section.getAttribute('id');
     }
   });

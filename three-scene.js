@@ -1,454 +1,537 @@
 // ===== 3D SAMURAI SCENE =====
-// A low-poly ink samurai stands at the center of the world. A drone-style
-// camera flies a smooth spline path around it as the visitor scrolls the
-// (perfectly normal, readable) HTML content in front of the canvas.
-// Falling sakura petals and a distant torii gate set the scene; everything
-// fogs out into the page's own paper color at the edges, like an ink wash
-// painting fading into blank paper.
+// A real samurai model (assets/samurai.glb) stands inside an ink-wash
+// mountain panorama. Each page section is a drone "shot" aimed at a part of
+// the samurai (face, katana on the back, hands, armor...). Scrolling flies the
+// camera between shots along an orbit around the figure, pulling out and
+// swooping back in during each transition, banking into the turns.
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const MODEL_URL = 'assets/samurai.glb';
+const MODEL_HEIGHT = 3.2;
+// Extra rotation (degrees) so the model faces +Z, if it doesn't out of the box.
+const MODEL_YAW_DEG = 0;
+// Add ?anchors to the URL to see a marker on each detected body part.
+const DEBUG_ANCHORS = new URLSearchParams(window.location.search).has('anchors');
+
+// One shot per section, in page order. `az` is the camera's angle around the
+// samurai (0 = in front, 90 = its left side, 180 = behind), `el` its angle
+// above the target, `dist` how far it hovers from the target. `side` places
+// the subject on screen: positive = right half (content panel on the left),
+// negative = left half.
+const SHOTS = [
+  { id: 'home', anchor: 'body', az: 18, el: -4, dist: 7.6, fov: 38, side: 0.24 },
+  { id: 'about', anchor: 'head', az: 28, el: 4, dist: 2.1, fov: 34, side: 0.24 },
+  { id: 'experience', anchor: 'back', az: 158, el: 14, dist: 2.6, fov: 38, side: -0.24 },
+  { id: 'projects', anchor: 'rightHand', az: -58, el: 12, dist: 1.8, fov: 36, side: 0.24 },
+  { id: 'skills', anchor: 'chest', az: 32, el: 2, dist: 2.4, fov: 36, side: -0.24 },
+  { id: 'education', anchor: 'crest', az: 12, el: 58, dist: 2.4, fov: 38, side: 0.24 },
+  { id: 'contact', anchor: 'body', az: -24, el: 8, dist: 10, fov: 40, side: -0.2 },
+];
+
+const PAPER = 0xefe4c9;
+const PINK = 0xd9709a;
 
 const canvas = document.getElementById('bg-canvas');
 
 function supportsWebGL() {
   try {
-    const testCanvas = document.createElement('canvas');
-    return !!(
-      window.WebGLRenderingContext &&
-      (testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl'))
-    );
+    const c = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl')));
   } catch (e) {
     return false;
   }
 }
 
+function hideLoader() {
+  if (window.__hideLoader) window.__hideLoader();
+}
+
 if (!canvas || !supportsWebGL()) {
   document.body.classList.add('no-webgl');
+  hideLoader();
 } else {
   runScene();
 }
 
 function runScene() {
-  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const isSmallScreen = window.innerWidth < 700;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const DEG = Math.PI / 180;
 
-  const PAPER_FOG = 0xe9dcc0;
-  const INK = 0x231d18;
-  const INK_SOFT = 0x453a30;
-  const PINK = 0xd9709a;
-  const PINK_DEEP = 0xb2456f;
-  const SEAL_RED = 0x9c3232;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-  // Drone flight path: one waypoint per section, sweeping around the
-  // samurai at varying angle/height/radius instead of jumping section to
-  // section in a straight line.
-  const SECTION_IDS = ['home', 'about', 'experience', 'projects', 'skills', 'education', 'contact'];
-  const FLIGHT_WAYPOINTS = [
-    { angle: 0, radius: 7.5, height: 0.3 },
-    { angle: 55, radius: 7, height: 2.6 },
-    { angle: 120, radius: 8, height: 0.6 },
-    { angle: 175, radius: 6.5, height: 3.2 },
-    { angle: 230, radius: 7.5, height: 1.2 },
-    { angle: 290, radius: 6.5, height: 2.2 },
-    { angle: 345, radius: 9, height: 1.6 },
-  ];
-  const LOOK_TARGET_WAYPOINTS = [
-    [0, 2.3, 0], [0, 1.9, 0], [0, 1.2, 0], [0, 2.1, 0],
-    [0, 1.5, 0], [0, 1.8, 0], [0, 1.6, 0],
-  ];
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(PAPER, 18, 60);
 
-  function waypointToVec3(wp) {
-    const rad = (wp.angle * Math.PI) / 180;
-    return new THREE.Vector3(Math.sin(rad) * wp.radius, wp.height, Math.cos(rad) * wp.radius);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+
+  const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.05, 200);
+
+  scene.add(new THREE.HemisphereLight(0xfff4e6, 0x8a7a66, 0.8));
+
+  const keyLight = new THREE.DirectionalLight(0xfff0dd, 2.0);
+  keyLight.position.set(4, 7, 5);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(2048, 2048);
+  keyLight.shadow.camera.left = -3;
+  keyLight.shadow.camera.right = 3;
+  keyLight.shadow.camera.top = 4.5;
+  keyLight.shadow.camera.bottom = -1;
+  keyLight.shadow.camera.near = 1;
+  keyLight.shadow.camera.far = 20;
+  keyLight.shadow.bias = -0.0005;
+  scene.add(keyLight);
+
+  // Pink rim light from behind separates the figure from the pale backdrop.
+  const rimLight = new THREE.DirectionalLight(PINK, 1.6);
+  rimLight.position.set(-4, 4, -5);
+  scene.add(rimLight);
+
+  const texLoader = new THREE.TextureLoader();
+  const samurai = new THREE.Group();
+  scene.add(samurai);
+
+  buildPanorama();
+  buildGround();
+  const petals = buildPetals();
+
+  // ----- Anchors: named points on the samurai the camera can aim at -----
+  const anchorFns = {};
+  const modelSize = new THREE.Vector3(1.4, MODEL_HEIGHT, 0.9);
+  setFallbackAnchors();
+
+  function staticAnchor(x, y, z) {
+    const local = new THREE.Vector3(x, y, z);
+    return (out) => samurai.localToWorld(out.copy(local));
   }
 
-  let scene, camera, renderer, clock;
-  let samuraiGroup, cape, katanaGlow;
-  let petals, petalVelocities;
-  let flightCurve, lookCurve;
-  let anchors = [];
-  let prevCamPos = new THREE.Vector3(0, 1.4, 8.5);
-  const mouse = { x: 0, y: 0 };
-  let smoothedT = 0;
+  function boneAnchor(bone, x = 0, y = 0, z = 0) {
+    const offset = new THREE.Vector3(x, y, z);
+    return (out) => bone.getWorldPosition(out).add(offset);
+  }
 
-  init();
+  // Reads the model's actual geometry to locate body parts, so any unrigged
+  // mesh works (assumes it faces +Z, so its right hand is on -X).
+  function setShapeAnchors(model) {
+    const H = MODEL_HEIGHT;
+    const pts = [];
+    const v = new THREE.Vector3();
+    model.updateMatrixWorld(true);
+    model.traverse((o) => {
+      const pos = o.isMesh && o.geometry && o.geometry.attributes.position;
+      if (!pos) return;
+      const step = Math.max(1, Math.floor(pos.count / 4000));
+      for (let k = 0; k < pos.count; k += step) {
+        v.fromBufferAttribute(pos, k);
+        if (o.isSkinnedMesh) o.applyBoneTransform(k, v);
+        pts.push(v.clone().applyMatrix4(o.matrixWorld));
+      }
+    });
+    if (pts.length < 50) return;
 
-  function init() {
-    scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(PAPER_FOG, 9, 26);
+    const band = (lo, hi) => pts.filter((p) => p.y >= lo * H && p.y <= hi * H);
+    const centroid = (arr) => arr.reduce((a, p) => a.add(p), new THREE.Vector3()).divideScalar(arr.length);
+    const median = (arr) => arr.slice().sort((a, b) => a - b)[Math.floor(arr.length / 2)];
 
-    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.copy(waypointToVec3(FLIGHT_WAYPOINTS[0]));
-
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
-
-    scene.add(new THREE.AmbientLight(0xfff3e0, 0.18));
-
-    const keyLight = new THREE.DirectionalLight(0xfff0dd, 0.22);
-    keyLight.position.set(4, 8, 5);
-    scene.add(keyLight);
-
-    // Rim light from behind, tinted pink, to separate the ink-dark
-    // samurai silhouette from the paper-colored fog.
-    const rimLight = new THREE.PointLight(PINK, 2.4, 20);
-    rimLight.position.set(-3, 3, -4);
-    scene.add(rimLight);
-
-    const fillLight = new THREE.PointLight(SEAL_RED, 0.6, 15);
-    fillLight.position.set(3, 1, 4);
-    scene.add(fillLight);
-
-    buildGround();
-    buildSamurai();
-    buildToriiGate();
-    buildPetals();
-
-    flightCurve = new THREE.CatmullRomCurve3(
-      FLIGHT_WAYPOINTS.map(waypointToVec3),
-      false,
-      'catmullrom',
-      0.5
-    );
-    lookCurve = new THREE.CatmullRomCurve3(
-      LOOK_TARGET_WAYPOINTS.map((p) => new THREE.Vector3(...p)),
-      false,
-      'catmullrom',
-      0.5
-    );
-
-    clock = new THREE.Clock();
-    refreshAnchors();
-
-    window.addEventListener('resize', onResize);
-    if (!prefersReducedMotion) {
-      window.addEventListener('mousemove', onMouseMove);
+    const top = band(0.84, 1.0);
+    if (top.length) {
+      const c = centroid(top);
+      anchorFns.head = staticAnchor(c.x, median(top.map((p) => p.y)), c.z);
     }
-    window.addEventListener('load', () => setTimeout(refreshAnchors, 300));
-
-    canvas.classList.add('is-ready');
-    animate();
+    const peak = band(0.97, 1.0);
+    if (peak.length) {
+      const c = centroid(peak);
+      anchorFns.crest = staticAnchor(c.x, c.y, c.z);
+    }
+    const chest = band(0.62, 0.76);
+    if (chest.length) {
+      const c = centroid(chest);
+      const zs = chest.map((p) => p.z);
+      const zMax = Math.max(...zs);
+      const zMin = Math.min(...zs);
+      anchorFns.chest = staticAnchor(c.x, c.y, c.z + (zMax - c.z) * 0.6);
+      anchorFns.back = staticAnchor(c.x, c.y, zMin + (c.z - zMin) * 0.2);
+    }
+    const arms = band(0.15, 0.65).sort((a, b) => a.x - b.x);
+    if (arms.length) {
+      const hand = centroid(arms.slice(0, Math.max(8, Math.floor(arms.length * 0.02))));
+      anchorFns.rightHand = staticAnchor(hand.x, hand.y, hand.z);
+    }
   }
 
-  function inkMaterial(extra) {
-    return new THREE.MeshStandardMaterial(
-      Object.assign(
-        { color: INK, roughness: 0.55, metalness: 0.25, flatShading: true },
-        extra || {}
-      )
-    );
+  // Rough proportions, used until a model has loaded.
+  function setFallbackAnchors() {
+    const { x: W, y: H, z: D } = modelSize;
+    anchorFns.body = staticAnchor(0, 0.52 * H, 0);
+    anchorFns.head = staticAnchor(0, 0.9 * H, 0.02 * H);
+    anchorFns.crest = staticAnchor(0, 1.0 * H, 0);
+    anchorFns.chest = staticAnchor(0, 0.7 * H, 0.15 * D);
+    anchorFns.back = staticAnchor(0, 0.68 * H, -0.5 * D);
+    anchorFns.rightHand = staticAnchor(-0.4 * W, 0.5 * H, 0.1 * D);
+  }
+
+  function useBoneAnchors(model) {
+    const found = {};
+    model.traverse((o) => {
+      if (!o.isBone) return;
+      const n = o.name.toLowerCase().replace(/mixamorig[:_]?/, '');
+      if (/thumb|index|middle|ring|pinky|finger/.test(n)) return;
+      if (!found.crest && /head.?(top|end)/.test(n)) found.crest = o;
+      else if (!found.head && /(^|[^a-z])head([^a-z]|$)/.test(n)) found.head = o;
+      else if (!found.rightHand && /(right.?hand|hand.?r(ight)?$|^r.?hand$)/.test(n)) found.rightHand = o;
+      else if (!found.chest && /(spine.?2|upper.?chest|chest)/.test(n)) found.chest = o;
+      else if (!found.spine && /spine/.test(n)) found.spine = o;
+    });
+    const H = MODEL_HEIGHT;
+    const D = modelSize.z;
+    const chest = found.chest || found.spine;
+    if (found.head) anchorFns.head = boneAnchor(found.head, 0, 0.04 * H, 0);
+    if (found.crest) anchorFns.crest = boneAnchor(found.crest);
+    else if (found.head) anchorFns.crest = boneAnchor(found.head, 0, 0.1 * H, 0);
+    if (chest) {
+      anchorFns.chest = boneAnchor(chest, 0, 0, 0.1 * D);
+      anchorFns.back = boneAnchor(chest, 0, 0, -0.45 * D);
+    }
+    if (found.rightHand) anchorFns.rightHand = boneAnchor(found.rightHand);
+    return Object.keys(found);
+  }
+
+  const markers = [];
+  function addAnchorMarkers() {
+    for (const name of Object.keys(anchorFns)) {
+      const m = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 12, 8),
+        new THREE.MeshBasicMaterial({ color: 0x00c2ff, depthTest: false })
+      );
+      m.renderOrder = 10;
+      m.userData.anchor = name;
+      scene.add(m);
+      markers.push(m);
+    }
+  }
+
+  // ----- Model -----
+  let mixer = null;
+
+  const gltfLoader = new GLTFLoader();
+  const draco = new DRACOLoader();
+  draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+  gltfLoader.setDRACOLoader(draco);
+  gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+
+  gltfLoader.load(
+    MODEL_URL,
+    (gltf) => {
+      const model = gltf.scene;
+      model.rotation.y = MODEL_YAW_DEG * DEG;
+
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      model.scale.setScalar(MODEL_HEIGHT / size.y);
+      box.setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.x -= center.x;
+      model.position.z -= center.z;
+      model.position.y -= box.min.y;
+      box.getSize(modelSize);
+
+      model.traverse((o) => {
+        if (o.isMesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
+      });
+
+      samurai.add(model);
+      setFallbackAnchors();
+      setShapeAnchors(model);
+      const bones = useBoneAnchors(model);
+      if (DEBUG_ANCHORS) addAnchorMarkers();
+
+      const idle = gltf.animations.find((c) => /idle|breath|stand/i.test(c.name));
+      if (idle && !reducedMotion) {
+        mixer = new THREE.AnimationMixer(model);
+        mixer.clipAction(idle).play();
+      }
+
+      console.info(
+        `[samurai] loaded; bones used: ${bones.join(', ') || 'none (shape estimates)'}; ` +
+          `clips: ${gltf.animations.map((c) => c.name).join(', ') || 'none'}`
+      );
+      hideLoader();
+    },
+    (e) => {
+      if (e.lengthComputable && window.__setLoaderProgress) {
+        window.__setLoaderProgress(e.loaded / e.total);
+      }
+    },
+    (err) => {
+      console.warn('[samurai] model failed to load; showing the scene without it.', err);
+      hideLoader();
+    }
+  );
+
+  // ----- Scene dressing -----
+  function buildPanorama() {
+    // The painting wraps the world on the inside of a cylinder. Mirrored
+    // repeat makes the two halves meet seamlessly.
+    const R = 38;
+    const H = (Math.PI * R) / 3;
+    const tex = texLoader.load('assets/mountains.webp');
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.MirroredRepeatWrapping;
+    tex.repeat.x = 2;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+    const geo = new THREE.CylinderGeometry(R, R, H, 96, 1, true, 0.38 * Math.PI, Math.PI * 2);
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      side: THREE.BackSide,
+      fog: false,
+      toneMapped: false,
+      depthWrite: false,
+    });
+    const pano = new THREE.Mesh(geo, mat);
+    pano.renderOrder = -1;
+    // The lake/mountain horizon (~30% up the painting) sits near eye level.
+    pano.position.y = H / 2 - 0.3 * H + 1.2;
+    scene.add(pano);
   }
 
   function buildGround() {
-    const groundGeo = new THREE.CircleGeometry(9, 48);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0xdccBA0,
-      roughness: 0.95,
-      metalness: 0,
-    });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -1.5;
-    scene.add(ground);
+    // No visible floor: the samurai stands on the page's own paper, and only
+    // its shadow is drawn.
+    const shadowCatcher = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.ShadowMaterial({ color: 0x3a2a1e, opacity: 0.22 })
+    );
+    shadowCatcher.rotation.x = -Math.PI / 2;
+    shadowCatcher.receiveShadow = true;
+    scene.add(shadowCatcher);
 
-    // Faint concentric ink ripples, like a raked zen garden.
-    for (let i = 1; i <= 4; i++) {
-      const ringGeo = new THREE.RingGeometry(i * 1.6, i * 1.6 + 0.04, 64);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: INK_SOFT,
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g2d = c.getContext('2d');
+    const grad = g2d.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(40,28,20,0.55)');
+    grad.addColorStop(1, 'rgba(40,28,20,0)');
+    g2d.fillStyle = grad;
+    g2d.fillRect(0, 0, 128, 128);
+    const contact = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.6, 2.6),
+      new THREE.MeshBasicMaterial({
+        map: new THREE.CanvasTexture(c),
         transparent: true,
-        opacity: 0.15,
-        side: THREE.DoubleSide,
-      });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.y = -1.49;
-      scene.add(ring);
-    }
-  }
-
-  function buildSamurai() {
-    samuraiGroup = new THREE.Group();
-
-    // Legs
-    const legGeo = new THREE.CylinderGeometry(0.14, 0.18, 1.1, 6);
-    [-0.22, 0.22].forEach((x) => {
-      const leg = new THREE.Mesh(legGeo, inkMaterial());
-      leg.position.set(x, -0.95, 0);
-      samuraiGroup.add(leg);
-    });
-
-    // Torso armor (do-maru): hex-plate cylinder tapering slightly.
-    const torsoGeo = new THREE.CylinderGeometry(0.55, 0.42, 1.15, 8);
-    const torso = new THREE.Mesh(torsoGeo, inkMaterial({ metalness: 0.4, roughness: 0.4 }));
-    torso.position.set(0, -0.05, 0);
-    samuraiGroup.add(torso);
-
-    // Waist guard (kusazuri) — flared skirt plates.
-    const waistGeo = new THREE.CylinderGeometry(0.62, 0.75, 0.4, 8, 1, true);
-    const waist = new THREE.Mesh(waistGeo, inkMaterial({ side: THREE.DoubleSide }));
-    waist.position.set(0, -0.55, 0);
-    samuraiGroup.add(waist);
-
-    // Shoulder armor (sode) — flattened boxes.
-    const sodeGeo = new THREE.BoxGeometry(0.4, 0.55, 0.15);
-    [-0.62, 0.62].forEach((x) => {
-      const sode = new THREE.Mesh(sodeGeo, inkMaterial());
-      sode.position.set(x, 0.55, 0);
-      sode.rotation.z = x > 0 ? -0.15 : 0.15;
-      samuraiGroup.add(sode);
-    });
-
-    // Neck + head base
-    const headGeo = new THREE.SphereGeometry(0.26, 10, 8);
-    const head = new THREE.Mesh(headGeo, inkMaterial({ roughness: 0.6 }));
-    head.position.set(0, 0.98, 0);
-    samuraiGroup.add(head);
-
-    // Kabuto helmet dome
-    const helmetGeo = new THREE.SphereGeometry(0.32, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.7);
-    const helmet = new THREE.Mesh(helmetGeo, inkMaterial({ metalness: 0.5, roughness: 0.3 }));
-    helmet.position.set(0, 1.12, 0);
-    samuraiGroup.add(helmet);
-
-    // Maedate crescent (the classic kabuto crescent ornament), glowing pink.
-    const crescentGeo = new THREE.TorusGeometry(0.26, 0.035, 8, 24, Math.PI * 1.3);
-    const crescentMat = new THREE.MeshStandardMaterial({
-      color: PINK_DEEP,
-      emissive: PINK,
-      emissiveIntensity: 0.7,
-      roughness: 0.3,
-    });
-    const crescent = new THREE.Mesh(crescentGeo, crescentMat);
-    crescent.position.set(0, 1.3, 0.08);
-    crescent.rotation.set(Math.PI / 2.4, 0, Math.PI / 2);
-    samuraiGroup.add(crescent);
-
-    // Katana, angled across the back, with a thin glowing edge.
-    const bladeGeo = new THREE.BoxGeometry(0.05, 1.5, 0.02);
-    const blade = new THREE.Mesh(bladeGeo, inkMaterial({ metalness: 0.7, roughness: 0.2 }));
-    const hiltGeo = new THREE.BoxGeometry(0.08, 0.3, 0.08);
-    const hilt = new THREE.Mesh(hiltGeo, inkMaterial());
-    hilt.position.y = -0.9;
-    blade.add(hilt);
-
-    const edgeGeo = new THREE.BoxGeometry(0.01, 1.45, 0.01);
-    const edgeMat = new THREE.MeshStandardMaterial({
-      color: PINK,
-      emissive: PINK,
-      emissiveIntensity: 1.1,
-    });
-    katanaGlow = new THREE.Mesh(edgeGeo, edgeMat);
-    katanaGlow.position.x = 0.028;
-    blade.add(katanaGlow);
-
-    blade.position.set(-0.5, 0.5, -0.25);
-    blade.rotation.set(0, 0, Math.PI / 5.5);
-    samuraiGroup.add(blade);
-
-    // Cape — a simple plane behind the figure that gets a wind-flutter
-    // animation via vertex displacement each frame.
-    const capeGeo = new THREE.PlaneGeometry(1.1, 1.8, 10, 14);
-    const capeMat = new THREE.MeshStandardMaterial({
-      color: SEAL_RED,
-      roughness: 0.9,
-      side: THREE.DoubleSide,
-    });
-    cape = new THREE.Mesh(capeGeo, capeMat);
-    cape.position.set(0, 0, -0.35);
-    cape.geometry.userData.basePositions = cape.geometry.attributes.position.array.slice();
-    samuraiGroup.add(cape);
-
-    samuraiGroup.position.y = 0.4;
-    samuraiGroup.scale.setScalar(1.7);
-    scene.add(samuraiGroup);
-  }
-
-  function buildToriiGate() {
-    const toriiGroup = new THREE.Group();
-    const pillarMat = new THREE.MeshStandardMaterial({ color: SEAL_RED, roughness: 0.8 });
-
-    const pillarGeo = new THREE.CylinderGeometry(0.16, 0.19, 4.2, 8);
-    [-2.1, 2.1].forEach((x) => {
-      const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-      pillar.position.set(x, 0.6, 0);
-      toriiGroup.add(pillar);
-    });
-
-    const topBeamGeo = new THREE.BoxGeometry(5.2, 0.22, 0.3);
-    const topBeam = new THREE.Mesh(topBeamGeo, pillarMat);
-    topBeam.position.set(0, 2.55, 0);
-    toriiGroup.add(topBeam);
-
-    const secondBeamGeo = new THREE.BoxGeometry(4.6, 0.16, 0.22);
-    const secondBeam = new THREE.Mesh(secondBeamGeo, pillarMat);
-    secondBeam.position.set(0, 2.15, 0);
-    toriiGroup.add(secondBeam);
-
-    const plaqueGeo = new THREE.BoxGeometry(0.5, 0.5, 0.08);
-    const plaqueMat = new THREE.MeshStandardMaterial({ color: INK });
-    const plaque = new THREE.Mesh(plaqueGeo, plaqueMat);
-    plaque.position.set(0, 2.3, 0.16);
-    toriiGroup.add(plaque);
-
-    toriiGroup.position.set(0, -1.5, -7);
-    toriiGroup.scale.setScalar(1.3);
-    scene.add(toriiGroup);
+        depthWrite: false,
+        toneMapped: false,
+      })
+    );
+    contact.rotation.x = -Math.PI / 2;
+    contact.position.y = 0.005;
+    scene.add(contact);
   }
 
   function buildPetals() {
-    const count = isSmallScreen ? 120 : 260;
-    const petalGeo = new THREE.PlaneGeometry(0.09, 0.09);
-    const petalMat = new THREE.MeshBasicMaterial({
-      color: PINK,
-      transparent: true,
-      opacity: 0.85,
-      side: THREE.DoubleSide,
-    });
-    petals = new THREE.InstancedMesh(petalGeo, petalMat, count);
-    petalVelocities = [];
+    // Five petal shapes cut from the sakura painting, one instanced mesh each.
+    const TYPES = 5;
+    const perType = window.innerWidth < 700 ? 24 : 44;
+    const atlas = texLoader.load('assets/petals.png');
+    atlas.colorSpace = THREE.SRGBColorSpace;
+    const geo = new THREE.PlaneGeometry(0.14, 0.14);
+    const meshes = [];
+    const state = [];
 
-    const dummy = new THREE.Object3D();
-    for (let i = 0; i < count; i++) {
-      const x = (Math.random() - 0.5) * 20;
-      const y = Math.random() * 14 - 2;
-      const z = (Math.random() - 0.5) * 20;
-      dummy.position.set(x, y, z);
-      dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-      dummy.updateMatrix();
-      petals.setMatrixAt(i, dummy.matrix);
-      petalVelocities.push({
-        fall: 0.25 + Math.random() * 0.35,
-        swaySpeed: 0.4 + Math.random() * 0.6,
-        swayAmount: 0.3 + Math.random() * 0.5,
-        phase: Math.random() * Math.PI * 2,
-        spin: (Math.random() - 0.5) * 1.5,
+    for (let t = 0; t < TYPES; t++) {
+      const tex = atlas.clone();
+      tex.repeat.set(1 / TYPES, 1);
+      tex.offset.set(t / TYPES, 0);
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.08,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        toneMapped: false,
       });
-    }
-    scene.add(petals);
-  }
-
-  function refreshAnchors() {
-    anchors = SECTION_IDS.map((id, i) => {
-      const el = document.getElementById(id);
-      if (!el) return { anchor: 0, index: i };
-      const rect = el.getBoundingClientRect();
-      const top = rect.top + window.scrollY;
-      return { anchor: top + el.offsetHeight / 2, index: i };
-    }).sort((a, b) => a.anchor - b.anchor);
-  }
-
-  // Maps scroll position to a continuous [0, 1] parameter across the whole
-  // flight path (not just the nearest two waypoints), so the camera eases
-  // smoothly through the entire spline rather than jumping section to
-  // section.
-  function computeFlightT() {
-    const scrollY = window.scrollY;
-    if (!anchors.length) return 0;
-    const n = anchors.length - 1;
-    if (scrollY <= anchors[0].anchor) return 0;
-    const last = anchors[anchors.length - 1];
-    if (scrollY >= last.anchor) return 1;
-
-    for (let i = 0; i < anchors.length - 1; i++) {
-      const a = anchors[i];
-      const b = anchors[i + 1];
-      if (scrollY >= a.anchor && scrollY <= b.anchor) {
-        const span = b.anchor - a.anchor || 1;
-        const localT = (scrollY - a.anchor) / span;
-        const eased = localT * localT * (3 - 2 * localT);
-        return (a.index + eased) / n;
+      const mesh = new THREE.InstancedMesh(geo, mat, perType);
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      meshes.push(mesh);
+      for (let i = 0; i < perType; i++) {
+        state.push({
+          mesh,
+          index: i,
+          pos: new THREE.Vector3((Math.random() - 0.5) * 24, Math.random() * 13 - 1, (Math.random() - 0.5) * 24),
+          rot: new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6),
+          spin: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(2),
+          fall: 0.25 + Math.random() * 0.35,
+          sway: 0.3 + Math.random() * 0.5,
+          phase: Math.random() * Math.PI * 2,
+          scale: 0.7 + Math.random() * 0.8,
+        });
       }
     }
-    return 1;
+    return { meshes, state, dummy: new THREE.Object3D() };
   }
 
-  function onMouseMove(e) {
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
+  function updatePetals(dt, elapsed) {
+    const { state, dummy, meshes } = petals;
+    const speed = reducedMotion ? 0.4 : 1;
+    for (const p of state) {
+      p.pos.y -= p.fall * dt * speed;
+      p.pos.x += Math.sin(elapsed * 0.6 + p.phase) * p.sway * dt * speed;
+      if (p.pos.y < -1) p.pos.set((Math.random() - 0.5) * 24, 12, (Math.random() - 0.5) * 24);
+      p.rot.x += p.spin.x * dt * speed;
+      p.rot.y += p.spin.y * dt * speed;
+      p.rot.z += p.spin.z * dt * speed;
+      dummy.position.copy(p.pos);
+      dummy.rotation.copy(p.rot);
+      dummy.scale.setScalar(p.scale);
+      dummy.updateMatrix();
+      p.mesh.setMatrixAt(p.index, dummy.matrix);
+    }
+    for (const m of meshes) m.instanceMatrix.needsUpdate = true;
   }
 
-  function onResize() {
+  // ----- Scroll -> shot mapping -----
+  // Each section holds its shot while its panel is on screen; the camera
+  // flies to the next shot in the gap between panels.
+  let keys = [];
+
+  function refreshLayout() {
+    const vh = window.innerHeight;
+    keys = SHOTS.map((s) => {
+      const el = document.getElementById(s.id);
+      if (!el) return null;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const start = top - vh * 0.35;
+      const end = Math.max(start, top + el.offsetHeight - vh * 0.65);
+      return { start, end };
+    });
+  }
+
+  function smoothstep(t) {
+    return t * t * (3 - 2 * t);
+  }
+
+  // Continuous shot index: 2.0 = holding shot 2, 2.5 = halfway to shot 3.
+  function scrollToShot(y) {
+    const n = keys.length;
+    if (!n || !keys[0]) return 0;
+    if (y <= keys[0].end) return 0;
+    for (let i = 0; i < n - 1; i++) {
+      const a = keys[i];
+      const b = keys[i + 1];
+      if (!a || !b) continue;
+      if (y <= a.end) return i;
+      if (y < b.start) return i + smoothstep((y - a.end) / (b.start - a.end));
+    }
+    return n - 1;
+  }
+
+  function shortestAngle(from, to) {
+    let d = (to - from) % 360;
+    if (d > 180) d -= 360;
+    if (d < -180) d += 360;
+    return d;
+  }
+
+  // ----- Input -----
+  const mouse = { x: 0, y: 0 };
+  if (!reducedMotion) {
+    window.addEventListener('mousemove', (e) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
+    });
+  }
+
+  window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    refreshAnchors();
-  }
+    refreshLayout();
+  });
+  window.addEventListener('load', () => setTimeout(refreshLayout, 300));
+  refreshLayout();
+
+  // ----- Frame loop -----
+  const clock = new THREE.Clock();
+  const va = new THREE.Vector3();
+  const vb = new THREE.Vector3();
+  const target = new THREE.Vector3();
+  const dir = new THREE.Vector3();
+  let g = scrollToShot(window.scrollY);
+  let prevAz = null;
+  let bank = 0;
+
+  canvas.classList.add('is-ready');
 
   function animate() {
     requestAnimationFrame(animate);
     const dt = Math.min(clock.getDelta(), 0.1);
-    const elapsed = clock.getElapsedTime();
+    const elapsed = clock.elapsedTime;
 
-    const targetT = computeFlightT();
-    const damp = 1 - Math.exp(-4 * dt);
-    smoothedT = THREE.MathUtils.lerp(smoothedT, targetT, damp);
+    const gTarget = scrollToShot(window.scrollY);
+    g += (gTarget - g) * (1 - Math.exp(-3.5 * dt));
 
-    const flightPos = flightCurve.getPointAt(THREE.MathUtils.clamp(smoothedT, 0, 1));
-    const lookPos = lookCurve.getPointAt(THREE.MathUtils.clamp(smoothedT, 0, 1));
+    const n = SHOTS.length;
+    const i = Math.min(Math.floor(g), n - 1);
+    const j = Math.min(i + 1, n - 1);
+    const t = g - i;
+    const A = SHOTS[i];
+    const B = SHOTS[j];
 
-    const parallaxX = prefersReducedMotion ? 0 : mouse.x * 0.3;
-    const parallaxY = prefersReducedMotion ? 0 : mouse.y * 0.18;
+    anchorFns[A.anchor](va);
+    anchorFns[B.anchor](vb);
+    target.lerpVectors(va, vb, t);
 
-    camera.position.set(flightPos.x + parallaxX, flightPos.y + parallaxY, flightPos.z);
+    // Drone swoop: rise and pull out mid-transition, then dive into the shot.
+    const swoop = reducedMotion ? 0 : Math.sin(Math.PI * t);
+    let az = A.az + shortestAngle(A.az, B.az) * t;
+    let el = THREE.MathUtils.lerp(A.el, B.el, t) + swoop * 10;
+    const dist = THREE.MathUtils.lerp(A.dist, B.dist, t) + swoop * (0.9 * Math.min(A.dist, B.dist) + 0.4);
+    const fov = THREE.MathUtils.lerp(A.fov, B.fov, t);
+    const side = window.innerWidth < 900 ? 0 : THREE.MathUtils.lerp(A.side, B.side, t);
+
+    az += mouse.x * 3;
+    el = THREE.MathUtils.clamp(el - mouse.y * 2, -20, 80);
+
+    const azR = az * DEG;
+    const elR = el * DEG;
+    dir.set(Math.sin(azR) * Math.cos(elR), Math.sin(elR), Math.cos(azR) * Math.cos(elR));
+    camera.position.copy(target).addScaledVector(dir, dist);
     camera.up.set(0, 1, 0);
-    camera.lookAt(lookPos.x, lookPos.y, lookPos.z);
+    camera.lookAt(target);
 
-    // Drone-style banking: roll into the turn based on lateral velocity.
-    if (!prefersReducedMotion) {
-      const lateral = flightPos.x - prevCamPos.x;
-      const forward = flightPos.z - prevCamPos.z;
-      const turnRate = lateral * forward >= 0 ? lateral - forward * 0.0001 : lateral;
-      const bank = THREE.MathUtils.clamp(-turnRate * 6, -0.18, 0.18);
+    // Bank into horizontal sweeps like a drone turning.
+    if (prevAz !== null && dt > 0 && !reducedMotion) {
+      const azVel = shortestAngle(prevAz, az) / dt;
+      const bankTarget = THREE.MathUtils.clamp(-azVel * 0.0035, -0.22, 0.22);
+      bank += (bankTarget - bank) * (1 - Math.exp(-4 * dt));
       camera.rotateZ(bank);
     }
-    prevCamPos.copy(flightPos);
+    prevAz = az;
 
-    // Samurai idle motion.
-    if (samuraiGroup) {
-      samuraiGroup.rotation.y = Math.sin(elapsed * 0.15) * 0.25 + smoothedT * Math.PI * 0.4;
-      samuraiGroup.position.y = 0.4 + Math.sin(elapsed * 0.7) * 0.04;
-    }
+    // Shift the frame so the subject sits beside the content panel.
+    camera.fov = fov;
+    camera.filmOffset = -side * 2 * Math.tan((fov * DEG) / 2) * camera.aspect * camera.getFilmWidth();
+    camera.updateProjectionMatrix();
 
-    // Cape flutter via vertex displacement.
-    if (cape && !prefersReducedMotion) {
-      const posAttr = cape.geometry.attributes.position;
-      const base = cape.geometry.userData.basePositions;
-      for (let i = 0; i < posAttr.count; i++) {
-        const bx = base[i * 3];
-        const by = base[i * 3 + 1];
-        const bz = base[i * 3 + 2];
-        const wave = Math.sin(elapsed * 2 + by * 2.5) * 0.06 * (1 - (by + 0.9) / 1.8);
-        posAttr.setXYZ(i, bx, by, bz + wave);
-      }
-      posAttr.needsUpdate = true;
-    }
-
-    // Falling sakura petals, looping endlessly regardless of scroll.
-    if (petals) {
-      const dummy = new THREE.Object3D();
-      for (let i = 0; i < petalVelocities.length; i++) {
-        petals.getMatrixAt(i, dummy.matrix);
-        dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
-        const v = petalVelocities[i];
-        dummy.position.y -= v.fall * dt;
-        dummy.position.x += Math.sin(elapsed * v.swaySpeed + v.phase) * v.swayAmount * dt;
-        if (dummy.position.y < -2) {
-          dummy.position.y = 12;
-          dummy.position.x = (Math.random() - 0.5) * 20;
-          dummy.position.z = (Math.random() - 0.5) * 20;
-        }
-        dummy.rotation.z += v.spin * dt;
-        dummy.updateMatrix();
-        petals.setMatrixAt(i, dummy.matrix);
-      }
-      petals.instanceMatrix.needsUpdate = true;
-    }
-
+    if (mixer) mixer.update(dt);
+    for (const m of markers) anchorFns[m.userData.anchor](m.position);
+    updatePetals(dt, elapsed);
     renderer.render(scene, camera);
   }
+  animate();
 }
